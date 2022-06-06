@@ -1,46 +1,91 @@
 package ru.netology;
 
 import com.codeborne.selenide.Condition;
+import com.codeborne.selenide.Configuration;
+import com.codeborne.selenide.logevents.SelenideLogger;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.Keys;
 
 import java.time.Duration;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
+import static com.codeborne.selenide.Condition.appear;
+import static com.codeborne.selenide.Condition.visible;
+import static com.codeborne.selenide.Selectors.withText;
 import static com.codeborne.selenide.Selenide.*;
+import static org.openqa.selenium.Keys.*;
 
-public class DeliveryCardTest {
+
+public class CardDeliveryTest {
+
+    @BeforeAll
+    static void setUpAll() {
+        SelenideLogger.addListener("allure", new AllureSelenide());
+    }
+
+    @AfterAll
+    static void tearDownAll() {
+        SelenideLogger.removeListener("allure");
+    }
 
     @BeforeEach
-    void setUp2() {
+    void setup() {
+        Configuration.headless = true;
         open("http://localhost:9999");
     }
 
-    public String meetingDate(int shift) {
-        LocalDate newDate = LocalDate.now().plusDays(shift);
-        return newDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+    @Test
+    void shouldSendForm() {
+
+        String planningDate = DataGenerator.generateDate(10);
+
+        RegistrationInfo info = DataGenerator
+                .Registration.generateInfo("ru");
+
+        $x("//input[@type='text']").val(info.getCity());
+        $("[data-test-id='date'] input").sendKeys(Keys.chord(SHIFT, HOME), BACK_SPACE);
+        $("[data-test-id='date'] input").setValue(planningDate);
+        $x("//input[@name='name']").val(info.getName());
+        $x("//input[@name='phone']").val(info.getPhone());
+        $x("//label[@data-test-id='agreement']").click();
+        $(withText("Запланировать")).click();
+
+        $x("//*[contains(text(),'Успешно!')]").should(appear, Duration.ofSeconds(5));
+        $(".notification__content").shouldHave(Condition.text("Встреча успешно запланирована на " + planningDate), Duration.ofSeconds(5));
+
     }
 
     @Test
-    public void successfulAppointmentBooking() {
-        RegistrationInfo info = DataGenerator.Registration.registrationInfo("ru");
-        String meetingDate = meetingDate(4);
-        String meetingOtherDate = meetingDate(10);
-        $("[placeholder=\"Город\"]").setValue(info.getCity());// заполнить поле город
-        $("[data-test-id='date'] input").sendKeys(Keys.chord(Keys.SHIFT, Keys.HOME), Keys.BACK_SPACE);// очистить дату
-        $("[placeholder=\"Дата встречи\"]").setValue(meetingDate);// заполнить поле дата
-        $("[name = \"name\"]").setValue(info.getName());//заполнить ФИО
-        $("[name = \"phone\"]").setValue(info.getPhone());//заполнить телефон
-        $("[data-test-id = \"agreement\"]").click();//нажать согласие
-        $x("//*[text()=\"Запланировать\"]").click();//нажать забронировать
-        $(".notification__content").shouldHave(Condition.text("Встреча успешно запланирована на " + meetingDate), Duration.ofSeconds(15));
-        $("[data-test-id='date'] input").sendKeys(Keys.chord(Keys.SHIFT, Keys.HOME), Keys.BACK_SPACE);// очистить дату
-        $("[placeholder=\"Дата встречи\"]").setValue(meetingOtherDate);// заполнить поле другой датой
-        $x("//*[text()=\"Запланировать\"]").click();//нажать забронировать
-        $("[data-test-id = \"replan-notification\"]").shouldHave(Condition.text("У вас уже запланирована встреча на другую дату. Перепланировать?"));
-        $x("//*[text()=\"Перепланировать\"]").click();//нажать перепланировать
-        $(".notification_status_ok").shouldHave(Condition.text("Встреча успешно запланирована на " + meetingOtherDate), Duration.ofSeconds(15));
+    void shouldSendFormRescheduling() {
+
+        String planningDate = DataGenerator.generateDate(5);
+        String planingDateSecond = DataGenerator.generateDate(10);
+
+        RegistrationInfo info = DataGenerator
+                .Registration.generateInfo("ru");
+
+        $x("//input[@type='text']").val(info.getCity());
+        $("[data-test-id='date'] input").sendKeys(Keys.chord(SHIFT, HOME), BACK_SPACE);
+        $("[data-test-id='date'] input").setValue(planningDate);
+        $x("//input[@name='name']").val(info.getName());
+        $x("//input[@name='phone']").val(info.getPhone());
+        $x("//label[@data-test-id='agreement']").click();
+        $(withText("Запланировать")).click();
+
+        $x("//*[contains(text(),'Успешно!')]").should(appear, Duration.ofSeconds(5));
+        $(".notification__content").shouldHave(Condition.text("Встреча успешно запланирована на " + planningDate), Duration.ofSeconds(5));
+
+        $("[data-test-id='date'] input").sendKeys(Keys.chord(SHIFT, HOME), BACK_SPACE);
+        $("[data-test-id='date'] input").setValue(planingDateSecond);
+        $(withText("Запланировать")).click();
+
+        $x("//*[contains(text(),'Необходимо подтверждение')]").should(visible, Duration.ofSeconds(5));
+        $(withText("Перепланировать")).click();
+
+        $x("//*[contains(text(),'Успешно!')]").should(appear, Duration.ofSeconds(5));
+        $(".notification__content").shouldHave(Condition.text("Встреча успешно запланирована на " + planingDateSecond), Duration.ofSeconds(5));
+
     }
 }
